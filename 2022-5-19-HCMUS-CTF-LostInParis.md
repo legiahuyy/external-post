@@ -81,5 +81,5 @@ We finally get the last password as `SnapshotIsReallyNiceForHacker`
 Combine all parts we have the flag:
 
 ```
-HCMUS-CTF{IL0veForensic_SnapshotIsReallyNiceForHacker_OverIsMyHero}
+HCMUS-CTF{IL0VEFORENSIC_SnapshotIsReallyNiceForHacker_OverIsMyHero}
 ```
