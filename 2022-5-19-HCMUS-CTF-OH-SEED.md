@@ -123,3 +123,4 @@ if __name__ == '__main__':
     solve()
 ```
 
+Run the code shall return you the flag. I can't really remember.
