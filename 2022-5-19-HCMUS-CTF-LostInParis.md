@@ -64,7 +64,7 @@ And we will dump the whole registry then search for in which the Incredimail's c
 
 ![](https://raw.githubusercontent.com/legiahuyy/external-post/main/images/2022-05-19_13-42.png)
 
-So these registry images have our passwords, we will rebuild the registry then use a tool called Incredimail Password Recovery to recover the passwords therein.
+So these registry images have our passwords, we will rebuild the registry then use a tool called [Incredimail Password Recovery](https://securityxploded.com/incredimail-password-decryptor.php) to recover the passwords therein.
 
 Let's fire up a Windows virtual machine and import the registry data.
 
